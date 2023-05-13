@@ -1,0 +1,19 @@
+<nav class="navbar navbar-expand-lg py-2 navbar-dark bg-dark shadow-sm">
+    <div class="container">
+        <a href="#" class="navbar-brand">
+          <!-- Logo Image -->
+          <img src="{{ url_for('static', filename='img/logo.png') }}" width="45" alt="" class="d-inline-block align-middle mr-2">
+          <!-- Logo Text -->
+          <span class="font-weight-bold">Sistem Absensi Guru | </span>
+          <!-- <a class="font-weight-bold" href="{{url_for('logout')}}" style="color:#ffffff;">Riwayat Absensi</a>
+          <a class="font-weight-bold" href="{{url_for('logout')}}" style="color:#ffffff;">Data Guru</a> -->
+        </a>
+        <div class="collapse navbar-collapse" id="navbarNavAltMarkup">
+          <div class="navbar-nav">
+            <a class="nav-item nav-link active" href="{{url_for('riwayat_absen')}}">Riwayat Absen</a>
+            <a class="nav-item nav-link active" href="{{url_for('home')}}">Daftar Guru</a>
+            <a class="nav-item nav-link active" href="{{url_for('logout')}}">Logout</a>          
+          </div>
+        </div>
+      </div>
+</nav>

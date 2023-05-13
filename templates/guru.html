@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    {% include "head.html" %}
+</head>
+<body>
+    
+{% if source == 'admin' %}
+    {% include "navbar.html" %}
+{% else %}
+    {% include "navbar_guru.html" %}
+{% endif %}
+
+<section class="py-1">
+    <div class="row mt-5">
+        <div class="col-lg-8 offset-lg-2">
+	    {% if mesage is defined and mesage %}
+			<div class="alert alert-warning">{{ mesage }}
+                <a href="#" class="close" data-dismiss="alert" aria-label="close">&times;</a>
+            </div>
+		{% endif %}
+            <h3>Absensi Guru</h3>
+            <hr>
+            <div class="row">
+                <div class="col-lg-3">
+                    {% if source == 'admin' %}
+                    {% else %}
+                        <a href="/absen_masuk" type="button" class="btn btn-info btn-lg"><b>Absen Masuk</b></a>
+                    {% endif %}
+                </div>
+                <div class="col-lg-3">
+                    {% if source == 'admin' %}
+                    {% else %}
+                        <a href="/absen_keluar" type="button" class="btn btn-success btn-lg"><b>Absen Keluar</b></a>
+                    {% endif %}
+                </div>
+            </div>
+
+            <br>
+            <table class="table" style="width: 80%">
+                <thead>
+                    <tr>
+                        <th>Person Id</th>
+                        <th>Name</th>
+                        <th>Skill</th>
+                        <th>Active</th>
+                        <th>Masuk</th>
+                        <th>Keluar</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in data %}
+                        <tr>
+                            <td>{{item[0]}}</td>
+                            <td>{{item[1]}}</td>
+                            <td>{{item[2]}}</td>
+                            <td>{{item[3]}}</td>
+                            <td>{{item[4]}}</td>
+                            <td>{{item[5]}}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+
+            </table>
+        </div>
+    </div>
+</section>
+
+</body>
+</html>
