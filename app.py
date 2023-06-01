@@ -45,34 +45,34 @@ def generate_dataset(nbr):
  
     cap = cv2.VideoCapture(0)
  
-    mycursor.execute("select ifnull(max(img_id), 0) from img_dataset")
+    mycursor.execute("select ifnull(max(id_gambar), 0) from dataset")
     row = mycursor.fetchone()
     lastid = row[0]
  
-    img_id = lastid
-    max_imgid = img_id + 100
+    id_gambar = lastid
+    max_imgid = id_gambar + 100
     count_img = 0
  
     while True:
         ret, img = cap.read()
         if face_cropped(img) is not None:
             count_img += 1
-            img_id += 1
+            id_gambar += 1
             face = cv2.resize(face_cropped(img), (200, 200))
             face = cv2.cvtColor(face, cv2.COLOR_BGR2GRAY)
  
-            file_name_path = "dataset/"+nbr+"."+ str(img_id) + ".jpg"
+            file_name_path = "dataset/"+nbr+"."+ str(id_gambar) + ".jpg"
             cv2.imwrite(file_name_path, face)
             cv2.putText(face, str(count_img), (50, 50), cv2.FONT_HERSHEY_COMPLEX, 1, (0, 255, 0), 2)
  
-            mycursor.execute("""INSERT INTO `img_dataset` (`img_id`, `img_person`) VALUES
-                                ('{}', '{}')""".format(img_id, nbr))
+            mycursor.execute("""INSERT INTO `dataset` (`id_gambar`, `id_guru`) VALUES
+                                ('{}', '{}')""".format(id_gambar, nbr))
             mydb.commit()
  
             frame = cv2.imencode('.jpg', face)[1].tobytes()
             yield (b'--frame\r\n'b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
  
-            if cv2.waitKey(1) == 13 or int(img_id) == int(max_imgid):
+            if cv2.waitKey(1) == 13 or int(id_gambar) == int(max_imgid):
                 break
                 cap.release()
                 cv2.destroyAllWindows()
@@ -135,10 +135,10 @@ def face_recognition(absen_type,userid):  # generate frame by frame from camera
                 cv2.rectangle(img, (x, y + h + 40), (x + w, y + h + 50), color, 2)
                 cv2.rectangle(img, (x, y + h + 40), (x + int(w_filled), y + h + 50), (153, 255, 255), cv2.FILLED)
  
-                mycursor.execute("select a.img_person, b.prs_name, b.prs_skill "
-                                 "  from img_dataset a "
-                                 "  left join guru b on a.img_person = b.prs_nbr "
-                                 " where img_id = " + str(id))
+                mycursor.execute("select a.id_guru, b.nama_guru "
+                                 "  from dataset a "
+                                 "  left join guru b on a.id_guru = b.id_guru "
+                                 " where id_gambar = " + str(id))
                 row = mycursor.fetchone()
                 pnbr = row[0]
                 pname = row[1]
@@ -147,14 +147,14 @@ def face_recognition(absen_type,userid):  # generate frame by frame from camera
                 if int(cnt) == 30:
                     cnt = 0
                     if absen_type == 'masuk':
-                        mycursor.execute("insert into accs_hist (accs_date, accs_prsn, accs_added) values('"+str(date.today())+"', '" + pnbr + "', now())")
+                        mycursor.execute("insert into riwayat (tanggal_riwayat, id_guru, tanggal_absen_masuk) values('"+str(date.today())+"', '" + pnbr + "', now())")
                     else:
-                        mycursor.execute("SELECT * FROM accs_hist WHERE DATE_FORMAT(accs_added, '%Y-%m-%d') = CURDATE() and accs_prsn =%s", (userid, ))
+                        mycursor.execute("SELECT * FROM riwayat WHERE DATE_FORMAT(tanggal_absen_masuk, '%Y-%m-%d') = CURDATE() and id_guru =%s", (userid, ))
                         check_absen_masuk = mycursor.fetchall()
                         if check_absen_masuk:
-                            mycursor.execute("UPDATE accs_hist SET accs_date_out = now() WHERE accs_prsn = '" + userid + "' AND DATE_FORMAT(accs_added, '%Y-%m-%d') = curdate();")
+                            mycursor.execute("UPDATE riwayat SET tanggal_absen_keluar = now() WHERE id_guru = '" + userid + "' AND DATE_FORMAT(tanggal_absen_masuk, '%Y-%m-%d') = curdate();")
                         else:
-                            mycursor.execute("insert into accs_hist (accs_date_out, accs_prsn) values('"+str(date.today())+"', '" + pnbr + "', now())")
+                            mycursor.execute("insert into riwayat (tanggal_absen_keluar, id_guru) values('"+str(date.today())+"', '" + pnbr + "', now())")
 
                     mydb.commit()
  
@@ -211,7 +211,7 @@ def home():
     # Check if user is loggedin
     if 'loggedin' in session:
         # User is loggedin show them the home page
-        mycursor.execute("select prs_nbr, prs_name, prs_skill, prs_active, prs_added from guru")
+        mycursor.execute("select id_guru, nama_guru, status_guru, tanggal_registrasi from guru")
         data = mycursor.fetchall()
         return render_template('index.html', data=data, mesage = 'Already login')
         # return render_template('user.html', mesage = 'Already login')
@@ -222,9 +222,9 @@ def home():
 def riwayat_absen():
     # Check if user is loggedin
     if 'loggedin' in session:
-        mycursor.execute("select a.accs_id, a.accs_prsn, b.prs_name, b.prs_skill, a.accs_added, a.accs_date_out "
-                        "  from accs_hist a "
-                        "  left join guru b on a.accs_prsn = b.prs_nbr "
+        mycursor.execute("select a.id_riwayat, a.id_guru, b.nama_guru, a.tanggal_absen_masuk, a.tanggal_absen_keluar "
+                        "  from riwayat a "
+                        "  left join guru b on a.id_guru = b.id_guru "
                         " order by 1 desc")
         data = mycursor.fetchall()
         return render_template('guru.html', data=data, source = 'admin')
@@ -236,11 +236,11 @@ def riwayat_absen():
 def home_guru():
     # Check if user is loggedin
     if 'loggedin' in session:
-        mycursor.execute("select a.accs_id, a.accs_prsn, b.prs_name, b.prs_skill, a.accs_added, a.accs_date_out "
-                        "  from accs_hist a "
-                        "  left join guru b on a.accs_prsn = b.prs_nbr "
-                        " where a.accs_prsn =%s"
-                        " order by 1 desc", (session['prs_nbr'], ))
+        mycursor.execute("select a.id_riwayat, a.id_guru, b.nama_guru, a.tanggal_absen_masuk, a.tanggal_absen_keluar "
+                        "  from riwayat a "
+                        "  left join guru b on a.id_guru = b.id_guru "
+                        " where a.id_guru =%s"
+                        " order by 1 desc", (session['id_guru'], ))
         data = mycursor.fetchall()
         return render_template('guru.html', data=data)
 
@@ -249,7 +249,7 @@ def home_guru():
 
 @app.route('/addprsn')
 def addprsn():
-    mycursor.execute("select ifnull(max(prs_nbr) + 1, 101) from guru")
+    mycursor.execute("select ifnull(max(id_guru) + 1, 101) from guru")
     row = mycursor.fetchone()
     nbr = row[0]
     # print(int(nbr))
@@ -264,7 +264,7 @@ def addprsn_submit():
     prspassword = request.form.get('txtpassword')
     prsskill = request.form.get('optskill')
  
-    mycursor.execute("""INSERT INTO `guru` (`prs_nbr`, `prs_name`, `prs_skill`, `email`, `password`) VALUES
+    mycursor.execute("""INSERT INTO `guru` (`id_guru`, `nama_guru`, `email`, `password`) VALUES
                     ('{}', '{}', '{}', '{}', '{}')""".format(prsnbr, prsname, prsskill, prsemail, prspassword))
     mydb.commit()
  
@@ -284,7 +284,7 @@ def vidfeed_dataset(nbr):
 def video_feed(absen_type):
     # Video streaming route. Put this in the src attribute of an img tag
     if 'loggedin' in session:
-        return Response(face_recognition(absen_type,session['prs_nbr']), mimetype='multipart/x-mixed-replace; boundary=frame')
+        return Response(face_recognition(absen_type,session['id_guru']), mimetype='multipart/x-mixed-replace; boundary=frame')
     
     return redirect(url_for('login_guru'))
 
@@ -292,11 +292,11 @@ def video_feed(absen_type):
 # def fr_page():
 #     if 'loggedin' in session:
 #         """Video streaming home page."""
-#         mycursor.execute("select a.accs_id, a.accs_prsn, b.prs_name, b.prs_skill, a.accs_added "
-#                         "  from accs_hist a "
-#                         "  left join guru b on a.accs_prsn = b.prs_nbr "
-#                         " where a.accs_date = curdate() and a.accs_prsn =%s"
-#                         " order by 1 desc", (session['prs_nbr'], ))
+#         mycursor.execute("select a.id_riwayat, a.id_guru, b.nama_guru, b.prs_skill, a.tanggal_absen_masuk "
+#                         "  from riwayat a "
+#                         "  left join guru b on a.id_guru = b.id_guru "
+#                         " where a.tanggal_riwayat = curdate() and a.id_guru =%s"
+#                         " order by 1 desc", (session['id_guru'], ))
 #         data = mycursor.fetchall()
 #         pdb.set_trace()
 #         print("Saat absen keluar: " + str(status_keluar))
@@ -316,12 +316,12 @@ def countTodayScan():
     mycursor = mydb.cursor()
  
     mycursor.execute("select count(*) "
-                     "  from accs_hist "
-                     " where accs_added is NOT NULL and DATE_FORMAT(accs_added, '%Y-%m-%d') = CURDATE() and accs_prsn =%s", (session['prs_nbr'], ))
+                     "  from riwayat "
+                     " where tanggal_absen_masuk is NOT NULL and DATE_FORMAT(tanggal_absen_masuk, '%Y-%m-%d') = CURDATE() and id_guru =%s", (session['id_guru'], ))
 
     # mycursor.execute("select count(*) "
-    #                  "  from accs_hist "
-    #                  " where accs_date = curdate() ")
+    #                  "  from riwayat "
+    #                  " where tanggal_riwayat = curdate() ")
     row = mycursor.fetchone()
     rowcount = row[0]
  
@@ -338,8 +338,8 @@ def countTodayScanOut():
     mycursor = mydb.cursor()
 
     mycursor.execute("select count(*) "
-                     "  from accs_hist "
-                     " where accs_date_out is NOT NULL and DATE_FORMAT(accs_date_out, '%Y-%m-%d') = CURDATE() and accs_prsn =%s", (session['prs_nbr'], ))
+                     "  from riwayat "
+                     " where tanggal_absen_keluar is NOT NULL and DATE_FORMAT(tanggal_absen_keluar, '%Y-%m-%d') = CURDATE() and id_guru =%s", (session['id_guru'], ))
     row = mycursor.fetchone()
     rowcount = row[0]
  
@@ -355,10 +355,10 @@ def loadData():
     )
     mycursor = mydb.cursor()
  
-    mycursor.execute("select a.accs_id, a.accs_prsn, b.prs_name, b.prs_skill, date_format(a.accs_added, '%H:%i:%s') "
-                     "  from accs_hist a "
-                     "  left join guru b on a.accs_prsn = b.prs_nbr "
-                     " where a.accs_date = curdate() "
+    mycursor.execute("select a.id_riwayat, a.id_guru, b.nama_guru, date_format(a.tanggal_absen_masuk, '%H:%i:%s') "
+                     "  from riwayat a "
+                     "  left join guru b on a.id_guru = b.id_guru "
+                     " where a.tanggal_riwayat = curdate() "
                      " order by 1 desc")
     data = mycursor.fetchall()
  
@@ -377,7 +377,7 @@ def loadData():
 def login():
     if 'loggedin' in session:
         # User is loggedin show them the home page
-        mycursor.execute("select prs_nbr, prs_name, prs_skill, prs_active, prs_added from guru")
+        mycursor.execute("select id_guru, nama_guru, status_guru, tanggal_registrasi from guru")
         data = mycursor.fetchall()
         return render_template('index.html', data=data, mesage = 'Already login')
         # return render_template('user.html', mesage = 'Already login')
@@ -394,11 +394,11 @@ def login():
 
             if user:
                 session['loggedin'] = True
-                session['userid'] = user[0]
+                session['id_admin'] = user[0]
                 session['name'] = user[1]
                 session['email'] = user[2]
                 mesage = 'Logged in successfully !'
-                mycursor.execute("select prs_nbr, prs_name, prs_skill, prs_active, prs_added from guru")
+                mycursor.execute("select id_guru, nama_guru, status_guru, tanggal_registrasi from guru")
                 data = mycursor.fetchall()
                 return render_template('index.html', data=data, mesage = mesage)
             else:
@@ -409,7 +409,7 @@ def login():
 def login_guru():
     if 'loggedin' in session:
         # User is loggedin show them the home page
-        # mycursor.execute('select prs_nbr, prs_name, prs_skill, prs_active, prs_added from guru where prs_nbr =%s', (session['prs_nbr'], ))
+        # mycursor.execute('select id_guru, nama_guru, status_guru, tanggal_registrasi from guru where id_guru =%s', (session['id_guru'], ))
         return redirect(url_for('home_guru'))
 
         # return render_template('user.html', mesage = 'Already login')
@@ -426,16 +426,16 @@ def login_guru():
             # pdb.set_trace()
             if user:
                 session['loggedin'] = True
-                session['prs_nbr'] = user[0]
-                session['prs_name'] = user[1]
+                session['id_guru'] = user[0]
+                session['nama_guru'] = user[1]
                 session['email'] = user[2]
                 mesage = 'Logged in successfully !'
-                # mycursor.execute('select prs_nbr, prs_name, prs_skill, prs_active, prs_added from guru where prs_nbr =%s', (session['prs_nbr'], ))
-                mycursor.execute("select a.accs_id, a.accs_prsn, b.prs_name, b.prs_skill, a.accs_added, a.accs_date_out "
-                                "  from accs_hist a "
-                                "  left join guru b on a.accs_prsn = b.prs_nbr "
-                                " where a.accs_prsn =%s"
-                                " order by 1 desc", (session['prs_nbr'], ))
+                # mycursor.execute('select id_guru, nama_guru, status_guru, tanggal_registrasi from guru where id_guru =%s', (session['id_guru'], ))
+                mycursor.execute("select a.id_riwayat, a.id_guru, b.nama_guru, a.tanggal_absen_masuk, a.tanggal_absen_keluar "
+                                "  from riwayat a "
+                                "  left join guru b on a.id_guru = b.id_guru "
+                                " where a.id_guru =%s"
+                                " order by 1 desc", (session['id_guru'], ))
                 data = mycursor.fetchall()
                 return render_template('guru.html', data=data, mesage = mesage)
             else:
@@ -445,15 +445,15 @@ def login_guru():
 @app.route('/logout')
 def logout():
     session.pop('loggedin', None)
-    session.pop('userid', None)
+    session.pop('id_admin', None)
     session.pop('email', None)
     return redirect(url_for('login'))
 
 @app.route('/logout_guru')
 def logout_guru():
     session.pop('loggedin', None)
-    session.pop('prs_nbr', None)
-    session.pop('prs_name', None)
+    session.pop('id_guru', None)
+    session.pop('nama_guru', None)
     session.pop('email', None)
     return redirect(url_for('login_guru'))
 
@@ -484,27 +484,27 @@ def register():
 @app.route('/absen_masuk')
 def absen_masuk():
     if 'loggedin' in session:
-        # mycursor.execute('select prs_nbr, prs_name, prs_skill, prs_active, prs_added from guru where email =%s', (session['email'], ))
-        mycursor.execute("SELECT * FROM accs_hist WHERE DATE_FORMAT(accs_added, '%Y-%m-%d') = CURDATE() and accs_prsn =%s", (session['prs_nbr'], ))
+        # mycursor.execute('select id_guru, nama_guru, prs_skill, status_guru, tanggal_registrasi from guru where email =%s', (session['email'], ))
+        mycursor.execute("SELECT * FROM riwayat WHERE DATE_FORMAT(tanggal_absen_masuk, '%Y-%m-%d') = CURDATE() and id_guru =%s", (session['id_guru'], ))
         check_date = mycursor.fetchall()
         if check_date:
-            # mycursor.execute("select prs_nbr, prs_name, prs_skill, prs_active, prs_added from guru where prs_nbr=%s", (session['prs_nbr'], ))
+            # mycursor.execute("select id_guru, nama_guru, prs_skill, status_guru, tanggal_registrasi from guru where id_guru=%s", (session['id_guru'], ))
             # data = mycursor.fetchall()
             """Video streaming home page."""
-            mycursor.execute("select a.accs_id, a.accs_prsn, b.prs_name, b.prs_skill, a.accs_added, a.accs_date_out "
-                            "  from accs_hist a "
-                            "  left join guru b on a.accs_prsn = b.prs_nbr "
-                            " where a.accs_prsn =%s"
-                            " order by 1 desc", (session['prs_nbr'], ))
+            mycursor.execute("select a.id_riwayat, a.id_guru, b.nama_guru, a.tanggal_absen_masuk, a.tanggal_absen_keluar "
+                            "  from riwayat a "
+                            "  left join guru b on a.id_guru = b.id_guru "
+                            " where a.id_guru =%s"
+                            " order by 1 desc", (session['id_guru'], ))
             data = mycursor.fetchall()
             return render_template('guru.html', data=data, mesage = 'sudah absen masuk', source = 'guru')
         else:
             """Video streaming home page."""
-            mycursor.execute("select a.accs_id, a.accs_prsn, b.prs_name, b.prs_skill, a.accs_added, a.accs_date_out "
-                            "  from accs_hist a "
-                            "  left join guru b on a.accs_prsn = b.prs_nbr "
-                            " where a.accs_prsn =%s"
-                            " order by 1 desc", (session['prs_nbr'], ))
+            mycursor.execute("select a.id_riwayat, a.id_guru, b.nama_guru, a.tanggal_absen_masuk, a.tanggal_absen_keluar "
+                            "  from riwayat a "
+                            "  left join guru b on a.id_guru = b.id_guru "
+                            " where a.id_guru =%s"
+                            " order by 1 desc", (session['id_guru'], ))
             data = mycursor.fetchall()
 
             return render_template('fr_page.html', data=data, type='masuk', source = 'guru')
@@ -515,23 +515,23 @@ def absen_masuk():
 @app.route('/absen_keluar')
 def absen_keluar():
     if 'loggedin' in session:
-        mycursor.execute("SELECT * FROM accs_hist WHERE DATE_FORMAT(accs_date_out, '%Y-%m-%d') = CURDATE() and accs_prsn =%s", (session['prs_nbr'], ))
+        mycursor.execute("SELECT * FROM riwayat WHERE DATE_FORMAT(tanggal_absen_keluar, '%Y-%m-%d') = CURDATE() and id_guru =%s", (session['id_guru'], ))
         check_date = mycursor.fetchall()
         if check_date:
-            mycursor.execute("select a.accs_id, a.accs_prsn, b.prs_name, b.prs_skill, a.accs_added, a.accs_date_out "
-                            "  from accs_hist a "
-                            "  left join guru b on a.accs_prsn = b.prs_nbr "
-                            " where a.accs_prsn =%s"
-                            " order by 1 desc", (session['prs_nbr'], ))
+            mycursor.execute("select a.id_riwayat, a.id_guru, b.nama_guru, a.tanggal_absen_masuk, a.tanggal_absen_keluar "
+                            "  from riwayat a "
+                            "  left join guru b on a.id_guru = b.id_guru "
+                            " where a.id_guru =%s"
+                            " order by 1 desc", (session['id_guru'], ))
             data = mycursor.fetchall()
             return render_template('guru.html', data=data, mesage = 'sudah absen keluar', source = 'guru')
         else:
             """Video streaming home page."""
-            mycursor.execute("select a.accs_id, a.accs_prsn, b.prs_name, b.prs_skill, a.accs_added, a.accs_date_out "
-                            "  from accs_hist a "
-                            "  left join guru b on a.accs_prsn = b.prs_nbr "
-                            " where a.accs_prsn =%s"
-                            " order by 1 desc", (session['prs_nbr'], ))
+            mycursor.execute("select a.id_riwayat, a.id_guru, b.nama_guru, a.tanggal_absen_masuk, a.tanggal_absen_keluar "
+                            "  from riwayat a "
+                            "  left join guru b on a.id_guru = b.id_guru "
+                            " where a.id_guru =%s"
+                            " order by 1 desc", (session['id_guru'], ))
             data = mycursor.fetchall()
 
             return render_template('fr_page_keluar.html', data=data, type='keluar', source = 'guru')
